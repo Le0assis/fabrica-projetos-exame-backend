@@ -12,7 +12,11 @@ class Message:
             'content': content,
             'horario': datetime.utcnow()
         }
-        return self.collection.insert_one(doc)
+        return self.collection.update_one(
+            {"chat_id": chat_id},
+            {"$push": {"messages": doc}},  # Adiciona a mensagem ao histórico
+            upsert=True  # Cria um novo documento se o chat_id não for encontrado
+        )
     
     def get_history (self, chat_id:str):
         return(

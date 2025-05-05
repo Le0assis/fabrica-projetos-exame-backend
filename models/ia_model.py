@@ -9,7 +9,7 @@ load_dotenv()
 class ChatBot:
 
     def __init__(self, model = "gemini-2.0-flash", chat_id = None):
-        self.client = gen.configure(api_key=os.getenv("GEMINI_API_KEY"))
+        gen.configure(api_key=os.getenv("GEMINI_API_KEY"))
         self.model = gen.GenerativeModel(model)
         self.chat_id = chat_id
         self.history = self.load_history()
@@ -48,29 +48,16 @@ class ChatBot:
             return result["history"]
         return []
         
-    def generate_response(self):
-        # Gerando a resposta com streaming
+    async def generate_response(self):
         contents = []
-
         for part in self.history:
-            for p in part.parts:
-                contents.append({"role": part.role, "text": p.text})
+            contents.append({
+                "role": part.role,
+                "parts": [{"text": p.text} for p in part.parts]
+            })
 
-        # Configurando a geração de conteúdo com fluxo
-        generate_content_config = types.GenerateContentConfig(
-            response_mime_type="application/json",  # Tipo de resposta esperado
-        )
-
-        # Usando o método `generate_content_stream` para gerar a resposta em partes
-        response = ""
-        for chunk in self.client.models.generate_content_stream(
-            model=self.model,
-            contents=contents,
-            config=generate_content_config,
-        ):
-            response += chunk.text
-            print(chunk.text, end="")  # Mostra o texto à medida que vai sendo gerado
-        
+        response_data = await self.model.generate_content_async(contents=contents)
+        response = response_data.text
         self.add_bot_response(response)
         return response
 
