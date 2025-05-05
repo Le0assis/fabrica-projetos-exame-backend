@@ -1,0 +1,67 @@
+# To run this code you need to install the following dependencies:
+# pip install google-genai
+
+import base64
+import os
+from google import genai
+from google.genai import types
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+
+def generate():
+    client = genai.Client(
+        api_key=os.getenv("GEMINI_API_KEY"),
+    )
+
+    model = "gemini-2.0-flash"
+    contents = [
+        types.Content(
+            role="user",
+            parts=[
+                types.Part.from_text(text="""Você é um chatbot especializado em marketing digital.
+        **até ter toda informação básica para montar o texto suas respostas devem ser curtas, mas foque em ter uma conversa fluida com o cliente**
+        Evite explicações longas e forneça detalhes de acordo com o que  o usuário pedir.
+        Você vai ser responsavel em montar os textos de marketing para as redes sociais, tenha em enfase o instagram mas isso varia de acordo com o cliente
+        Tenha uma conversa fluida para que nao fique cansativa e use o historico de chats a seu favor"""),
+            ],
+        ),
+        types.Content(
+            role="model",
+            parts=[
+                types.Part.from_text(text=os.getenv("prompt")),
+                types.Part.from_text(text="""{
+  \"status\": \"configuração_recebida\",
+  \"message\": \"Entendido! Estou pronto para começar a criar seus textos de marketing. Pode me dizer sobre o que vamos falar hoje?\"
+}"""),
+            ],
+        ),
+        types.Content(
+            role="user",
+            parts=[
+                types.Part.from_text(text= input_usuario()),
+            ],
+        ),
+    ]
+    generate_content_config = types.GenerateContentConfig(
+        response_mime_type="application/json",
+    )
+
+    for chunk in client.models.generate_content_stream(
+        model=model,
+        contents=contents,
+        config=generate_content_config,
+    ):
+        print(chunk.text, end="")
+
+def input_usuario():
+    print("Escreva aqui: ")
+    resposta = str(input())
+    return resposta
+
+
+if __name__ == "__main__":
+    while True:
+        generate()
