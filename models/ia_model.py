@@ -42,10 +42,10 @@ class ChatBot:
             types.Content(role="model", parts=[types.Part.from_text(text = message)])
             )
     
-    def load_history(self):
+    def load_history(self ):
         result = messages_collection.find_one({"chat_id": self.chat_id})
         if result:
-            return result["history"]
+            return result['messages']
         return []
         
     async def generate_response(self):

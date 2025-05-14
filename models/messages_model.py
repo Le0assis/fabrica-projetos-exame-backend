@@ -8,8 +8,10 @@ class Message:
     def add_message(self, chat_id: str, role: str, content: str):
         doc = {
             'chat_id': chat_id,
-            'role': role,
-            'content': content,
+            'messages':{
+                'role': role,
+                'content': content,
+            },
             'horario': datetime.utcnow()
         }
         return self.collection.update_one(

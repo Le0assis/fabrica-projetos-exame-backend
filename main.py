@@ -22,7 +22,7 @@ async def root():
 async def start_chat():
     chat_id = str(uuid.uuid4())
     chatbot = ChatBot(chat_id = chat_id)
-    return {"chat_id": chat_id}
+    return message["chat_id": chat_id]
 
 @app.post("/send-message/{chat_id}")
 async def send_message(chat_id: str, messages: MessageInput):
@@ -33,7 +33,7 @@ async def send_message(chat_id: str, messages: MessageInput):
     message.add_message(chat_id, "User", messages.user_message)
     message.add_message(chat_id, "bot_reply", bot_reply)
 
-    return {"bot_response": bot_reply}
+    return {"bot_reply": bot_reply}
 
 
 if __name__ == "__main__":
