@@ -3,6 +3,7 @@ import google.generativeai as gen
 from google.genai import types
 from dotenv import load_dotenv
 from db import messages_collection
+import json
 
 load_dotenv()
 
@@ -29,7 +30,8 @@ class ChatBot:
             types.Content(role="model", parts=[types.Part.from_text(text=model_response)]),
             types.Content(role="model", parts=[types.Part.from_text(text="""{
                 \"status\": \"configuração_recebida\",
-                \"message\": \"Entendido! Estou pronto para começar a criar seus textos de marketing. Pode me dizer sobre o que vamos falar hoje?\"
+                \"message\": \"Entendido! Estou pronto para começar a criar seus textos 
+                               de marketing. Pode me dizer sobre o que vamos falar hoje?\"
             }""")])
         ]
     def add_user_message(self, message: str):
@@ -47,8 +49,8 @@ class ChatBot:
         if result:
             return result['messages']
         return []
-        
-    async def generate_response(self):
+    
+    def generate_response(self):
         contents = []
         for part in self.history:
             contents.append({
@@ -56,21 +58,29 @@ class ChatBot:
                 "parts": [{"text": p.text} for p in part.parts]
             })
 
-        response_data = await self.model.generate_content_async(contents=contents)
+        response_data = self.model.generate_content(contents=contents)
         response = response_data.text
         self.add_bot_response(response)
         return response
+
 
     # def generate_response(self):
     #     response = self.model.generate_content(self.history)
     #     reply = response.text
     #     self.add_bot_response(reply)
     #     return reply
-    
+
+
+
+
     def run(self):
         while True:
             user_input = input("\nVocê: ")
             self.add_user_message(user_input)
             print("IA: ", end="")
             self.generate_response()
+
+
+
+# Suponha que você tenha isso:
 

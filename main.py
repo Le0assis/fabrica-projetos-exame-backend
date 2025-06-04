@@ -1,41 +1,33 @@
-from fastapi import FastAPI
-from db import messages_collection
-from models.messages_model import Message
+import streamlit as st
+import json
 from models.ia_model import ChatBot
-from pydantic import BaseModel
-import uuid
+
+st.set_page_config(page_title="Chat com IA", page_icon="🤖", layout="centered")
+st.title("ChatBot Eficaz")
 
 
-app = FastAPI()
-message = Message(messages_collection)
+if "bot" not in st.session_state:
+    st.session_state.bot = ChatBot()
 
-class MessageInput(BaseModel):
-    user_message: str
+if "resposta" not in st.session_state:
+    st.session_state.resposta = ""
 
+def extrair_mensagem(texto):
+    try:
+        dados = json.loads(texto)
+        return dados.get("message", texto)
+    except json.JSONDecodeError:
+        return texto
 
+with st.form("form_pergunta", clear_on_submit=True):
+    pergunta = st.text_input("Digite sua pergunta:")
+    enviar = st.form_submit_button("Enviar")
 
-@app.get("/")
-async def root():
-    return {"Chat": "Seu chat está Funcionando"}
+# Processamento da resposta
+if enviar and pergunta.strip():
+    st.session_state.bot.add_user_message(pergunta)
+    resposta = st.session_state.bot.generate_response()
+    st.session_state.resposta = extrair_mensagem(resposta) 
 
-@app.post("/Start-Chat")
-async def start_chat():
-    chat_id = str(uuid.uuid4())
-    chatbot = ChatBot(chat_id = chat_id)
-    return message["chat_id": chat_id]
-
-@app.post("/send-message/{chat_id}")
-async def send_message(chat_id: str, messages: MessageInput):
-    chatbot = ChatBot(chat_id=chat_id)
-    chatbot.add_user_message(messages.user_message)
-    bot_reply = await chatbot.generate_response()
-
-    message.add_message(chat_id, "User", messages.user_message)
-    message.add_message(chat_id, "bot_reply", bot_reply)
-
-    return {"bot_reply": bot_reply}
-
-
-if __name__ == "__main__":
-    chatbot = ChatBot(chat_id="teste-local")
-    chatbot.run()
+# Exibe resposta da IA
+st.text_area("Resposta da IA:", value=st.session_state.resposta, height=100, disabled=True)
