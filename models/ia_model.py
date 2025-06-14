@@ -1,86 +1,85 @@
 import os
-import google.generativeai as gen
-from google.genai import types
+import google.generativeai as genai
 from dotenv import load_dotenv
 from db import messages_collection
-import json
 
+# Carrega variáveis de ambiente
 load_dotenv()
 
+# Configura a API
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
 class ChatBot:
-
-    def __init__(self, model = "gemini-2.0-flash", chat_id = None):
-        gen.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        self.model = gen.GenerativeModel(model)
+    def __init__(self, model="gemini-1.5-flash", chat_id=None):
+        self.model_name = model
         self.chat_id = chat_id
-        self.history = self.load_history()
-        self._init_system_prompt()
 
-    def _init_system_prompt(self):
-        system_prompt = """Você é um chatbot especializado em marketing digital.
-        **até ter toda informação básica para montar o texto suas respostas devem ser curtas, mas foque em ter uma conversa fluida com o cliente**
-        Evite explicações longas e forneça detalhes de acordo com o que  o usuário pedir.
-        Você vai ser responsavel em montar os textos de marketing para as redes sociais, tenha em enfase o instagram mas isso varia de acordo com o cliente
-        Tenha uma conversa fluida para que nao fique cansativa e use o historico de chats a seu favor"""
-        
-        model_response = os.getenv("prompt")
-
-        self.history = [
-            types.Content(role="user", parts=[types.Part.from_text(text = system_prompt)]),
-            types.Content(role="model", parts=[types.Part.from_text(text=model_response)]),
-            types.Content(role="model", parts=[types.Part.from_text(text="""{
-                \"status\": \"configuração_recebida\",
-                \"message\": \"Entendido! Estou pronto para começar a criar seus textos 
-                               de marketing. Pode me dizer sobre o que vamos falar hoje?\"
-            }""")])
-        ]
-    def add_user_message(self, message: str):
-        self.history.append(
-            types.Content(role="user", parts=[types.Part.from_text(text = message)])
+        # Prompt do sistema
+        self.system_prompt_text = (
+            "Você é um chatbot especializado em marketing digital.\n"
+            "**Até ter toda informação básica para montar o texto suas respostas devem ser curtas, mas foque em ter uma conversa fluida com o cliente.**\n"
+            "Evite explicações longas e forneça detalhes de acordo com o que o usuário pedir.\n"
+            "Você vai ser responsável em montar os textos de marketing para as redes sociais, com ênfase no Instagram, mas isso varia conforme o cliente.\n"
+            "Tenha uma conversa fluida para que não fique cansativa e use o histórico de chats a seu favor. \n"
+            "***Não peça fotos seu formato não aceita mas de dicas para que tipo de foto postar isso sim***"
         )
-        
-    def add_bot_response(self, message: str):
-        self.history.append(
-            types.Content(role="model", parts=[types.Part.from_text(text = message)])
-            )
-    
-    def load_history(self ):
+
+        # Mensagem inicial
+        self.initial_model_response_text = os.getenv(
+            "PROMPT_INICIAL", 
+            "Olá! Que legal ter você por aqui. Sou seu parceiro de marketing digital, pronto para criar textos para suas redes sociais. Para começar, sobre o que você gostaria de falar hoje?"
+        )
+
+        # Histórico base (sistema + saudação)
+        self.base_history = [
+            {"role": "user", "parts": [self.system_prompt_text]},
+            {"role": "model", "parts": [self.initial_model_response_text]},
+            {"role": "model", "parts": ['{"status": "configuração_recebida", "message": "Entendido! Estou pronto para começar a criar seus textos de marketing. Pode me dizer sobre o que vamos falar hoje?"}']}
+        ]
+
+        # Instancia o modelo
+        self.model = genai.GenerativeModel(self.model_name)
+
+    def _load_and_convert_history(self):
         result = messages_collection.find_one({"chat_id": self.chat_id})
-        if result:
-            return result['messages']
-        return []
-    
-    def generate_response(self):
-        contents = []
-        for part in self.history:
-            contents.append({
-                "role": part.role,
-                "parts": [{"text": p.text} for p in part.parts]
-            })
+        loaded_history = []
 
-        response_data = self.model.generate_content(contents=contents)
-        response = response_data.text
-        self.add_bot_response(response)
-        return response
+        if result and 'messages' in result:
+            for msg in result['messages']:
+                parts = []
 
+                # Trata casos onde 'parts' é uma lista de strings ou dicts
+                if 'parts' in msg and isinstance(msg['parts'], list):
+                    for p in msg['parts']:
+                        if isinstance(p, dict) and 'text' in p:
+                            parts.append(p['text'])
+                        else:
+                            parts.append(str(p))
+                elif 'text' in msg:
+                    parts = [msg['text']]
+                
+                if 'role' in msg and parts:
+                    loaded_history.append({
+                        "role": msg['role'],
+                        "parts": parts
+                    })
 
-    # def generate_response(self):
-    #     response = self.model.generate_content(self.history)
-    #     reply = response.text
-    #     self.add_bot_response(reply)
-    #     return reply
+        return loaded_history
 
+    def generate_response(self, user_message: str) -> str:
+        try:
+            # Junta histórico + nova mensagem
+            history = self._load_and_convert_history()
+            full_content = self.base_history + history + [
+                {"role": "user", "parts": [user_message]}
+            ]
 
+            # Geração síncrona
+            response = self.model.generate_content(full_content)
 
+            # Retorna texto gerado
+            return response.text
 
-    def run(self):
-        while True:
-            user_input = input("\nVocê: ")
-            self.add_user_message(user_input)
-            print("IA: ", end="")
-            self.generate_response()
-
-
-
-# Suponha que você tenha isso:
-
+        except Exception as e:
+            print(f"Erro ao gerar resposta da IA: {e}")
+            raise
